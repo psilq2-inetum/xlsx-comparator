@@ -28,6 +28,3 @@ class FilteredTee:
     def flush(self):
         for f in self.files:
             f.flush()
-
-
-output_manager = OutputToFileAndConsole('sortie_print.txt')
