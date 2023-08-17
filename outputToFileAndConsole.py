@@ -5,7 +5,7 @@ class OutputToFileAndConsole:
     def __init__(self, filename):
         self.filename = filename
         self.original_stdout = sys.stdout
-        self.output_file = open(self.filename, 'a')  # 'a' pour append (ajouter à la fin)
+        self.output_file = open(self.filename, 'a', encoding="utf-8")  # 'a' pour append (ajouter à la fin)
 
     def start(self):
         filtered_stdout = FilteredTee(self.original_stdout, self.output_file)

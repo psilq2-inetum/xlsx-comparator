@@ -6,8 +6,12 @@ import sys
 import pandas as pd
 
 from outputToFileAndConsole import OutputToFileAndConsole
+from csv_comparator.csv_comparator import CsvComparator
+from pathlib import Path
+from csv import DictWriter
+from csv_comparator.utils import round_float
 
-skip_line = 5
+skip_line = 6
 
 
 def compare_two_files(original, test):
@@ -18,18 +22,15 @@ def compare_two_files(original, test):
         :param test: Chemin vers le fichier Excel de test.
         """
 
-    try:
+    df1_sheet_names = pd.ExcelFile(original).sheet_names
+    df2_sheet_names = pd.ExcelFile(test).sheet_names
 
-        df1_sheet_names = pd.ExcelFile(original).sheet_names
-        df2_sheet_names = pd.ExcelFile(test).sheet_names
-
-        same_sheets(df1_sheet_names, df2_sheet_names)
-
-    except Exception as e:
-        print("Erreur : ", str(e))
+    same_sheets(df1_sheet_names, df2_sheet_names, Path(original).name, Path(test).name)
 
 
-def same_sheets(df1_sheet_names, df2_sheet_names):
+
+
+def same_sheets(df1_sheet_names, df2_sheet_names, name1, name2):
     """
         Vérifie si les feuilles de deux fichiers Excel sont identiques.
 
@@ -52,43 +53,64 @@ def same_sheets(df1_sheet_names, df2_sheet_names):
             continue
             # raise ValueError(f"Le nom des feuilles est différent : {df1_sheet_names[i]} != {df2_sheet_names[i]} à "f"l\'index {i}")
 
-        df1 = pd.read_excel(original_file, df1_sheet_names[i])
-        df2 = pd.read_excel(test_file, df2_sheet_names[i])
+        df1 = pd.read_excel(original_file, df1_sheet_names[i], skiprows=skip_line, header=None)
+        df2 = pd.read_excel(test_file, df2_sheet_names[i], skiprows=skip_line, header=None)
 
-        compare_sheet(df1, df2)
+        compare_sheet(df1.to_dict('records'), df2.to_dict('records'), df1_sheet_names[i], name1, name2)
         print('\n------------ Fin Feuille ---------------\n')
     output_manager.stop()
 
 
-def compare_sheet(df1, df2):
+def compare_sheet(lines1, lines2, sheet_name, name1, name2):
     """
         Compare deux DataFrames et vérifie s'ils sont identiques.
 
-        :param df1: Le premier DataFrame à comparer.
-        :param df2: Le deuxième DataFrame à comparer.
-
-        :raise Si les DataFrames ne sont pas identiques.
+        :param df1: Les lignes du premier fichier à comparer.
+        :param df2: Les lignes du second fichier à comparer.
         """
 
-    df1 = df1.iloc[skip_line:]  # Ignorer les premières lignes du DataFrame
-    df2 = df2.iloc[skip_line:]
+    if is_same_dimension(lines1, lines2):
+        
+        evaluation_functions = {
+            18: round_float(2)
+        }
+        
+        csv_comparator = CsvComparator(lines1, lines2, [16, 17], [1, 2], evaluation_functions=evaluation_functions)
+        
+        valid, (len1, len2, _) = csv_comparator.compare_length()
+        
+        if not valid:
+            print(f"Il n'y a pas le même nombre de lignes dans les deux fichiers: {len1} != {len2}")
+            
+        missing_lines_1 = csv_comparator.compare_lines_in_a()
+        missing_lines_2 = csv_comparator.compare_lines_in_b()
+        
+        if len(missing_lines_1) > 0:
+            print(f"Lignes en écart dans le premier fichier: {len(missing_lines_1)}")
+            with open(Path("out") / f"missing_{name1}_{sheet_name}.csv", "w", encoding="utf-8-sig", newline="") as missing_1_out:
+                fieldnames = list(range(len(missing_lines_1[0])))
+                fieldnames.append("CAUSE")
+                csv_writer = DictWriter(missing_1_out, fieldnames=fieldnames, delimiter=";")
+                csv_writer.writerows(missing_lines_1)
+            
+        if len(missing_lines_2) > 0:
+            print(f"Lignes en écart dans le deuxième fichier: {len(missing_lines_2)}")
+            with open(Path("out") / f"missing_{name2}_{sheet_name}.csv", "w", encoding="utf-8-sig", newline="") as missing_2_out:
+                fieldnames = list(range(len(missing_lines_2[0])))
+                fieldnames.append("CAUSE")
+                csv_writer = DictWriter(missing_2_out, fieldnames=fieldnames, delimiter=";")
+                csv_writer.writerows(missing_lines_2)
+        
+        if len(missing_lines_1) == len(missing_lines_2) and len(missing_lines_1) == 0:
+            print('Les deux feuilles sont identiques')
 
-    if is_same_matrice(df1, df2):
-        if not df1.equals(df2):
-            differences = df1[df1 != df2]
-            print(f"Les deux feuilles ne sont pas identiques :\n {differences}")
-            # raise ValueError(f"Les deux feuilles ne sont pas identiques :\n {differences}")
-        print('Les deux feuilles sont identiques')
 
-
-def is_same_matrice(df1, df2):
-    if df1.shape[1] != df2.shape[1]:
-        print(f"Le nombre colonnes n'est pas identiques : {df1.shape[0]} != {df2.shape[0]}")
-        # raise ValueError(f"Le nombre colonnes n'est pas identiques :\n {df1.shape[0]} != {df2.shape[0]}")
+def is_same_dimension(lines1, lines2):
+    if len(lines1) == 0 or len(lines2) == 0:
+        print("L'un des deux tableaux est vide")
         return False
-    if df1.shape[0] != df2.shape[0]:
-        print(f"Le nombre de lignes n'est pas identiques : {df1.shape[0]} != {df2.shape[0]}")
-        # raise ValueError(f"Le nombre de lignes n'est pas identiques :\n {df1.shape[0]} != {df2.shape[0]}")
+    if len(lines1[0]) != len(lines2[0]):
+        print(f"Le nombre de colonnes n'est pas identiques : {len(lines1[0])} != {len(lines2[0])}")
         return False
     return True
 
