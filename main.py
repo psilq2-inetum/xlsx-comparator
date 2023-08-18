@@ -9,8 +9,8 @@ from outputToFileAndConsole import OutputToFileAndConsole
 from csv_comparator.csv_comparator import CsvComparator
 from pathlib import Path
 from csv import DictWriter
-from csv_comparator.utils import round_float
 
+# LIGNES A SAUTER EN DEBUT DE FICHIER (POUR LES DEUX FICHIERS)
 skip_line = 6
 
 
@@ -72,10 +72,10 @@ def compare_sheet(lines1, lines2, sheet_name, name1, name2):
     if is_same_dimension(lines1, lines2):
         
         evaluation_functions = {
-            18: round_float(2)
         }
         
-        csv_comparator = CsvComparator(lines1, lines2, [16, 17], [1, 2], evaluation_functions=evaluation_functions)
+        # CHANGER ICI POUR COLUMNS_TO_EXCLUDE ET SEARCH_COLUMNS
+        csv_comparator = CsvComparator(lines1, lines2, [], [], evaluation_functions=evaluation_functions)
         
         valid, (len1, len2, _) = csv_comparator.compare_length()
         

@@ -15,3 +15,6 @@ def print_avancement(lignes_traitees, lignes_totales, lignes_manquantes, delais_
         print(f"Progress: {lignes_traitees / lignes_totales * 100}% ({lignes_traitees}/{lignes_totales}) - Manquantes: {lignes_manquantes}")
         return current_time
     return last_time
+
+def comparer_lowercase():
+    return lambda a,b: a.lower() == b.lower() 
