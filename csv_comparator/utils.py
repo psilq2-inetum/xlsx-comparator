@@ -17,4 +17,4 @@ def print_avancement(lignes_traitees, lignes_totales, lignes_manquantes, delais_
     return last_time
 
 def comparer_lowercase():
-    return lambda a,b: a.lower() == b.lower() 
+    return lambda a,b: a.lower() == b.lower()

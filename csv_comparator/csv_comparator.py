@@ -21,11 +21,12 @@ class LineComparator:
 
 class CsvComparator:
     
-    def __init__(self, lines_a: list[dict], lines_b: list[dict], columns_to_exclude: list, search_columns: list, evaluation_functions: [dict, None] = None) -> None:
+    def __init__(self, lines_a: list[dict], lines_b: list[dict], columns_to_exclude: list, search_columns: list, evaluation_functions: [dict, None] = None, search_functions: [dict, None] = None) -> None:
         self.lines_a = CsvSorter(lines_a, search_columns).sort()
         self.lines_b = CsvSorter(lines_b, search_columns).sort()
         self.search_columns = search_columns
         self.line_comparator = LineComparator(columns_to_exclude=columns_to_exclude, evalutation_functions=evaluation_functions)
+        self.search_functions = search_functions
     
     def compare_length(self) -> tuple[bool, tuple[int, int, int]]:
         len_a = len(self.lines_a)
@@ -33,27 +34,36 @@ class CsvComparator:
         
         return (len_a == len_b, (len_a, len_b, len_a - len_b))
 
+    def bisect_key_function(self, line):
+        columns = []
+        
+        search_columns = self.search_columns if len(self.search_columns) > 0 else self.lines_b[0].keys()
+        
+        for col in search_columns:
+            value = self.search_functions[col](line[col]) if col in self.search_functions else line[col]
+            columns.append(value)
+        
+        return tuple(columns)
+
     def compare_lines_in_a(self) -> list[dict]:
         missing_a_lines = []
         i = 0
         last_time = 0
         count_lines_b = len(self.lines_b)
         
-        compare_lambda = lambda x: tuple(x[col] for col in (self.search_columns if len(self.search_columns) > 0 else self.lines_b[0].keys()))
-        
         for line_b in self.lines_b:
             last_time = print_avancement(i, count_lines_b, len(missing_a_lines), 1, last_time)
             i+=1
             
-            search_b = compare_lambda(line_b)
+            search_b = self.bisect_key_function(line_b)
             
-            search_index = bisect.bisect_left(self.lines_a, search_b, key=compare_lambda)
+            search_index = bisect.bisect_left(self.lines_a, search_b, key=self.bisect_key_function)
             
             if search_index == len(self.lines_a):
                 missing_a_lines.append({**line_b, "CAUSE": "Ligne manquante"})
             else:
                 found_a = self.lines_a[search_index]
-                if search_b != compare_lambda(found_a):
+                if search_b != self.bisect_key_function(found_a):
                     missing_a_lines.append({**line_b, "CAUSE": "Ligne manquante"})
                     continue
                     
@@ -71,21 +81,19 @@ class CsvComparator:
         last_time = 0
         count_lines_a = len(self.lines_a)
         
-        compare_lambda = lambda x: tuple(x[col] for col in (self.search_columns if len(self.search_columns) > 0 else self.lines_a[0].keys()))
-        
         for line_a in self.lines_a:
             last_time = print_avancement(i, count_lines_a, len(missing_b_lines), 1, last_time)
             i+=1
             
-            search_a = compare_lambda(line_a)
+            search_a = self.bisect_key_function(line_a)
             
-            search_index = bisect.bisect_left(self.lines_b, search_a, key=compare_lambda)
+            search_index = bisect.bisect_left(self.lines_b, search_a, key=self.bisect_key_function)
             
             if search_index == len(self.lines_b):
                 missing_b_lines.append({**line_a, "CAUSE": "Ligne manquante"})
             else:
                 found_b = self.lines_b[search_index]
-                if search_a != compare_lambda(found_b):
+                if search_a != self.bisect_key_function(found_b):
                     missing_b_lines.append({**line_a, "CAUSE": "Ligne manquante"})
                     continue
                     
