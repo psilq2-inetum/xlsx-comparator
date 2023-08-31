@@ -45,6 +45,36 @@ class CsvComparator:
         
         return tuple(columns)
 
+    def determine_best_match(self, line: dict, matches: list[dict]) -> tuple[bool, list]:
+        best_score = -1
+        match_causes = None
+        
+        line_keys = self.bisect_key_function(line)
+        
+        for match in matches:
+            match_keys = self.bisect_key_function(match)
+            if match_keys != line_keys:
+                continue
+            
+            valid, causes = self.line_comparator.compare(line, match)
+            
+            # We found a line that match perfectly
+            if valid:
+                return valid, []
+            
+            score = len(causes)
+            
+            if best_score == -1 or score < best_score:
+                best_score = score
+                match_causes = [f"{col} ({expect_val},{found_val})" for (col, expect_val, found_val) in causes]
+        
+        # No line with matching unique key was found
+        if match_causes is None:
+            return False, "Ligne manquante"
+            
+        # One was found, but with differences
+        return False, match_causes
+
     def compare_lines_in_a(self) -> list[dict]:
         missing_a_lines = []
         i = 0
@@ -58,22 +88,20 @@ class CsvComparator:
             search_b = self.bisect_key_function(line_b)
             
             search_index = bisect.bisect_left(self.lines_a, search_b, key=self.bisect_key_function)
+            search_index_end = bisect.bisect(self.lines_a, search_b, key=self.bisect_key_function)
             
             if search_index == len(self.lines_a):
                 missing_a_lines.append({**line_b, "CAUSE": "Ligne manquante"})
             else:
-                found_a = self.lines_a[search_index]
-                if search_b != self.bisect_key_function(found_a):
-                    missing_a_lines.append({**line_b, "CAUSE": "Ligne manquante"})
-                    continue
-                    
-                valid, causes = self.line_comparator.compare(line_b, found_a)
+                matches = [self.lines_a[i] for i in range(search_index, search_index_end)]
+                
+                valid, causes = self.determine_best_match(line_b, matches)
                     
                 if not valid:
-                    causes = [f"{col} ({expect_val},{found_val})" for (col, expect_val, found_val) in causes]
                     missing_a_lines.append({**line_b, "CAUSE": f"Ecart detecté: {', '.join(causes)}"})
 
         return missing_a_lines
+                
     
     def compare_lines_in_b(self) -> list[dict]:
         missing_b_lines = []
@@ -88,19 +116,16 @@ class CsvComparator:
             search_a = self.bisect_key_function(line_a)
             
             search_index = bisect.bisect_left(self.lines_b, search_a, key=self.bisect_key_function)
+            search_index_end = bisect.bisect(self.lines_b, search_a, key=self.bisect_key_function)
             
             if search_index == len(self.lines_b):
                 missing_b_lines.append({**line_a, "CAUSE": "Ligne manquante"})
             else:
-                found_b = self.lines_b[search_index]
-                if search_a != self.bisect_key_function(found_b):
-                    missing_b_lines.append({**line_a, "CAUSE": "Ligne manquante"})
-                    continue
-                    
-                valid, causes = self.line_comparator.compare(line_a, found_b)
+                matches = [self.lines_b[i] for i in range(search_index, search_index_end)]
+                
+                valid, causes = self.determine_best_match(line_a, matches)
                     
                 if not valid:
-                    causes = [f"{col} ({expect_val},{found_val})" for (col, expect_val, found_val) in causes]
                     missing_b_lines.append({**line_a, "CAUSE": f"Ecart detecté: {', '.join(causes)}"})
         
         return missing_b_lines
