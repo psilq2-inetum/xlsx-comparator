@@ -73,7 +73,7 @@ class CsvComparator:
             return False, "Ligne manquante"
             
         # One was found, but with differences
-        return False, match_causes
+        return False, f"Ecart detecté: {', '.join(match_causes)}"
 
     def compare_lines_in_a(self) -> list[dict]:
         missing_a_lines = []
@@ -90,15 +90,12 @@ class CsvComparator:
             search_index = bisect.bisect_left(self.lines_a, search_b, key=self.bisect_key_function)
             search_index_end = bisect.bisect(self.lines_a, search_b, key=self.bisect_key_function)
             
-            if search_index == len(self.lines_a):
-                missing_a_lines.append({**line_b, "CAUSE": "Ligne manquante"})
-            else:
-                matches = [self.lines_a[i] for i in range(search_index, search_index_end)]
+            matches = [self.lines_a[i] for i in range(search_index, search_index_end)]
+            
+            valid, causes = self.determine_best_match(line_b, matches)
                 
-                valid, causes = self.determine_best_match(line_b, matches)
-                    
-                if not valid:
-                    missing_a_lines.append({**line_b, "CAUSE": f"Ecart detecté: {', '.join(causes)}"})
+            if not valid:
+                missing_a_lines.append({**line_b, "CAUSE": causes})
 
         return missing_a_lines
                 
@@ -117,15 +114,12 @@ class CsvComparator:
             
             search_index = bisect.bisect_left(self.lines_b, search_a, key=self.bisect_key_function)
             search_index_end = bisect.bisect(self.lines_b, search_a, key=self.bisect_key_function)
+
+            matches = [self.lines_b[i] for i in range(search_index, search_index_end)]
             
-            if search_index == len(self.lines_b):
-                missing_b_lines.append({**line_a, "CAUSE": "Ligne manquante"})
-            else:
-                matches = [self.lines_b[i] for i in range(search_index, search_index_end)]
+            valid, causes = self.determine_best_match(line_a, matches)
                 
-                valid, causes = self.determine_best_match(line_a, matches)
-                    
-                if not valid:
-                    missing_b_lines.append({**line_a, "CAUSE": f"Ecart detecté: {', '.join(causes)}"})
+            if not valid:
+                missing_b_lines.append({**line_a, "CAUSE": causes})
         
         return missing_b_lines
